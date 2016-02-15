@@ -6,7 +6,7 @@
 #include <CL/cl.h>
 #include <CL/cl_ext.h>
 #define STRING_BUFFER_LEN 1024
-
+#define BILLION  1000000000L
 using namespace std;
 
 /*
@@ -105,7 +105,6 @@ cl_mem input_b_buf; // num_devices elements
 cl_mem output_buf; // num_devices elements
 int status;
 
-	time_t start,end;
 
      clGetPlatformIDs(1, &platform, NULL);
      clGetPlatformInfo(platform, CL_PLATFORM_NAME, STRING_BUFFER_LEN, char_buffer, NULL);
@@ -144,7 +143,7 @@ int status;
         N* sizeof(float), NULL, &status);
     checkError(status, "Failed to create buffer for output");
 
-
+    
 
     // Transfer inputs to each device. Each of the host buffers supplied to
     // clEnqueueWriteBuffer here is already aligned to ensure that DMA is used
@@ -170,17 +169,19 @@ int status;
 	cout << "Begin of CPU's computation" << endl;
 	//Let the cpu compute the vector sum
         clock_t begin_cpu, end_cpu, begin_gpu, end_gpu;
-        double diff;
-        time (&start);
+	struct timespec cpu_begin, cpu_end, gpu_begin, gpu_end;
+	double gputime=0, cputime=0;
+
+	clock_gettime( CLOCK_REALTIME, &cpu_begin);
         begin_cpu=clock();
         for(unsigned j = 0; j < N; ++j) {
               ref_output[j] = input_a[j] + input_b[j];
               //printf("ref %f\n",ref_output[j]);
             }
-        time (&end);
+        clock_gettime( CLOCK_REALTIME, &cpu_end);
         end_cpu=clock();
-        diff = difftime (end,start);
-        printf ("CPU took %.2lf seconds to run.\n", diff );
+        cputime = (double)( cpu_end.tv_sec - cpu_begin.tv_sec ) + (double)( cpu_end.tv_nsec - cpu_begin.tv_nsec ) / BILLION;
+        printf ("CPU took %.2lf seconds to run.\n", cputime );
         printf("CPU took %ld clock cycles to run\n", end_cpu - begin_cpu);
     
     // Set kernel arguments.
@@ -206,7 +207,7 @@ int status;
     printf("Buffers unmapped\n");
 
     cout << "Begin of GPU's computation" << endl;
-    time(&start);
+    clock_gettime( CLOCK_REALTIME, &gpu_begin);
     begin_gpu=clock();
     status = clEnqueueNDRangeKernel(queue, kernel, 1, NULL,
     &global_work_size, NULL, 0, NULL, &kernel_event);
@@ -215,10 +216,10 @@ int status;
     status = clEnqueueReadBuffer(queue, output_buf, CL_TRUE,
         0, N* sizeof(float), output, 1, &kernel_event, &finish_event);
 
-   time (&end);
+   clock_gettime( CLOCK_REALTIME, &gpu_end);
    end_gpu=clock();
-   diff = difftime (end,start);
-   printf ("GPU took %.8lf seconds to run.\n", diff );
+   gputime = (double)( gpu_end.tv_sec - gpu_begin.tv_sec ) + (double)( gpu_end.tv_nsec - gpu_begin.tv_nsec ) / BILLION;
+   printf ("GPU took %.8lf seconds to run.\n", gputime);
    printf("GPU took %ld clocks to run\n", end_gpu-begin_gpu);
 // Verify results.
 bool pass = true;

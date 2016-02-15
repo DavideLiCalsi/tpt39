@@ -6,6 +6,7 @@
 #include <CL/cl.h>
 #include <CL/cl_ext.h>
 #define STRING_BUFFER_LEN 1024
+#define BILLION  1000000000L
 using namespace std;
 
 /*
@@ -159,13 +160,6 @@ unsigned int i,j;
     // Map the input and output buffers
     cl_event write_event[2];
     cl_event kernel_event,finish_event;
-    /*status = clEnqueueWriteBuffer(queue, input_a_buf, CL_FALSE,
-        0, N*N* sizeof(float), input_a, 0, NULL, &write_event[0]);
-    checkError(status, "Failed to transfer input A");
-
-    status = clEnqueueWriteBuffer(queue, input_b_buf, CL_FALSE,
-        0, N*N* sizeof(float), input_b, 0, NULL, &write_event[1]);
-    checkError(status, "Failed to transfer input B");*/
 
     input_a =  (float*) clEnqueueMapBuffer(queue, input_a_buf, CL_TRUE, CL_MAP_WRITE,0, N*N*sizeof(float),0, NULL, &write_event[0], &error_code);
     checkError(error_code, "Failed to map input A");
@@ -188,12 +182,12 @@ unsigned int i,j;
 	printf("Matrices both generated\n");
 
 
-	time_t start,end;
         clock_t cpu_b, cpu_e, gpu_b, gpu_e;
-	double diff;
+	struct timespec cpu_begin, cpu_end, gpu_begin, gpu_end;
+	double gputime=0, cputime=0;
 
 	cout << "Begin of CPU's computation" << endl;
-	time (&start);
+	clock_gettime( CLOCK_REALTIME, &cpu_begin);
 	cpu_b=clock();
 	for(unsigned i = 0; i < N; ++i) {
 		
@@ -205,11 +199,11 @@ unsigned int i,j;
 	      	}	//printf("ref %f\n",ref_output[j]);
 	}
 	cpu_e=clock();
-	time (&end);
+	clock_gettime( CLOCK_REALTIME, &cpu_end);
 	cout << "CPU calculated the product\n" << endl;
-	diff = difftime (end,start);
+	cputime = (double)( cpu_end.tv_sec - cpu_begin.tv_sec ) + (double)( cpu_end.tv_nsec - cpu_begin.tv_nsec ) / BILLION;
 	clock_t clocks_cpu = cpu_e - cpu_b;
-  	printf ("CPU took %.2lf seconds to run.\n", diff );
+  	printf ("CPU took %.2lf seconds to run.\n", cputime);
 	printf("CPU took %ld clock cycles to run\n", clocks_cpu);
 
 
@@ -239,7 +233,7 @@ unsigned int i,j;
     printf("Buffers unmapped\n");
 
     cout << "Start of GPU computation" << endl;
-    time(&start);
+    clock_gettime( CLOCK_REALTIME, &gpu_begin);
     gpu_b = clock();
     status = clEnqueueNDRangeKernel(queue, kernel, 2, global_work_offset,
          global_work_size, NULL, 1, write_event, &kernel_event);
@@ -248,12 +242,12 @@ unsigned int i,j;
     status = clEnqueueReadBuffer(queue, output_buf, CL_TRUE,
         0, N*N* sizeof(float), output, 1, &kernel_event, &finish_event);
    gpu_e = clock();
-   time (&end);
+   clock_gettime( CLOCK_REALTIME, &gpu_end);
    cout << "End of GPU computation" << endl;
 
    clock_t gpu_clocks = gpu_e - gpu_b;
-   diff = difftime (end,start);
-   printf ("GPU took %.8lf seconds to run.\n", diff );
+   gputime = (double)( gpu_end.tv_sec - gpu_begin.tv_sec ) + (double)( gpu_end.tv_nsec - gpu_begin.tv_nsec ) / BILLION;
+   printf ("GPU took %.8lf seconds to run.\n", gputime );
    printf("GPU took %ld clock cycles to run \n", gpu_clocks);
 
    printf("Conclusion: GPU proved to be approximately %f times faster than CPU\n", clocks_cpu * 1.0 / gpu_clocks);
